@@ -6,7 +6,7 @@ const vscode = require("vscode");
 const esp32Fs_1 = require("./esp32Fs");
 const actions_1 = require("./actions");
 const syncView_1 = require("./syncView");
-const usageView_1 = require("./usageView");
+const infoView_1 = require("./infoView");
 const mp = require("./mpremote");
 const mpremote_1 = require("./mpremote");
 const path = require("node:path");
@@ -44,98 +44,100 @@ function activate(context) {
         }
     }
     // Helper for delays in retry logic
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     // Workspace-level config and manifest stored in .mpy-workbench/
-    const MPY_WORKBENCH_DIR = '.mpy-workbench';
-    const MPY_CONFIG_FILE = 'config.json';
-    const MPY_MANIFEST_FILE = 'esp32sync.json';
+    const MPY_WORKBENCH_DIR = ".mpy-workbench";
+    const MPY_CONFIG_FILE = "config.json";
+    const MPY_MANIFEST_FILE = "esp32sync.json";
     async function ensureMpyWorkbenchDir(wsPath) {
         try {
             await fs.mkdir(path.join(wsPath, MPY_WORKBENCH_DIR), { recursive: true });
         }
-        catch { /* ignore */ }
+        catch {
+            /* ignore */
+        }
     }
     async function ensureWorkbenchIgnoreFile(wsPath) {
         try {
             await ensureMpyWorkbenchDir(wsPath);
-            const p = path.join(wsPath, MPY_WORKBENCH_DIR, '.mpyignore');
+            const p = path.join(wsPath, MPY_WORKBENCH_DIR, ".mpyignore");
             await fs.access(p);
         }
         catch {
             const content = buildDefaultMpyIgnoreContent();
             try {
-                await fs.writeFile(path.join(wsPath, MPY_WORKBENCH_DIR, '.mpyignore'), content, 'utf8');
+                await fs.writeFile(path.join(wsPath, MPY_WORKBENCH_DIR, ".mpyignore"), content, "utf8");
             }
             catch { }
         }
     }
     function buildDefaultMpyIgnoreContent() {
         return [
-            '# .mpyignore — default rules (similar to .gitignore). Adjust according to your project.',
-            '# Paths are relative to the workspace root.',
-            '',
-            '# VCS',
-            '.git/',
-            '.svn/',
-            '.hg/',
-            '',
-            '# IDE/Editor',
-            '.vscode/',
-            '.idea/',
-            '.vs/',
-            '',
-            '# SO',
-            '.DS_Store',
-            'Thumbs.db',
-            '',
-            '# Node/JS',
-            'node_modules/',
-            'dist/',
-            'out/',
-            'build/',
-            '.cache/',
-            'coverage/',
-            '.next/',
-            '.nuxt/',
-            '.svelte-kit/',
-            '.turbo/',
-            '.parcel-cache/',
-            '*.log',
-            'npm-debug.log*',
-            'yarn-debug.log*',
-            'yarn-error.log*',
-            'pnpm-debug.log*',
-            '',
-            '# Python',
-            '__pycache__/',
-            '*.py[cod]',
-            '*.pyo',
-            '*.pyd',
-            '.venv/',
-            'venv/',
-            '.env',
-            '.env.*',
-            '.mypy_cache/',
-            '.pytest_cache/',
-            '.coverage',
-            'coverage.xml',
-            '*.egg-info/',
-            '.tox/',
-            '',
-            '# Otros',
-            '*.swp',
-            '*.swo',
-            '',
-            '# MPY Workbench',
-            '.mpy-workbench/',
-            '/.mpy-workbench',
-            ''
-        ].join('\n');
+            "# .mpyignore — default rules (similar to .gitignore). Adjust according to your project.",
+            "# Paths are relative to the workspace root.",
+            "",
+            "# VCS",
+            ".git/",
+            ".svn/",
+            ".hg/",
+            "",
+            "# IDE/Editor",
+            ".vscode/",
+            ".idea/",
+            ".vs/",
+            "",
+            "# SO",
+            ".DS_Store",
+            "Thumbs.db",
+            "",
+            "# Node/JS",
+            "node_modules/",
+            "dist/",
+            "out/",
+            "build/",
+            ".cache/",
+            "coverage/",
+            ".next/",
+            ".nuxt/",
+            ".svelte-kit/",
+            ".turbo/",
+            ".parcel-cache/",
+            "*.log",
+            "npm-debug.log*",
+            "yarn-debug.log*",
+            "yarn-error.log*",
+            "pnpm-debug.log*",
+            "",
+            "# Python",
+            "__pycache__/",
+            "*.py[cod]",
+            "*.pyo",
+            "*.pyd",
+            ".venv/",
+            "venv/",
+            ".env",
+            ".env.*",
+            ".mypy_cache/",
+            ".pytest_cache/",
+            ".coverage",
+            "coverage.xml",
+            "*.egg-info/",
+            ".tox/",
+            "",
+            "# Otros",
+            "*.swp",
+            "*.swo",
+            "",
+            "# MPY Workbench",
+            ".mpy-workbench/",
+            "/.mpy-workbench",
+            "",
+        ].join("\n");
     }
     async function readWorkspaceConfig(wsPath) {
         try {
             const p = path.join(wsPath, MPY_WORKBENCH_DIR, MPY_CONFIG_FILE);
-            const txt = await fs.readFile(p, 'utf8');
+            const txt = await fs.readFile(p, "utf8");
             return JSON.parse(txt);
         }
         catch {
@@ -146,29 +148,41 @@ function activate(context) {
         try {
             await ensureMpyWorkbenchDir(wsPath);
             const p = path.join(wsPath, MPY_WORKBENCH_DIR, MPY_CONFIG_FILE);
-            await fs.writeFile(p, JSON.stringify(obj, null, 2), 'utf8');
+            await fs.writeFile(p, JSON.stringify(obj, null, 2), "utf8");
         }
         catch (e) {
-            console.error('Failed to write .mpy-workbench config', e);
+            console.error("Failed to write .mpy-workbench config", e);
         }
     }
     // Context key for welcome UI when no port is selected
     const updatePortContext = () => {
-        const v = vscode.workspace.getConfiguration().get("mpyWorkbench.connect", "auto");
+        const v = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.connect", "auto");
         const has = !!v && v !== "auto";
-        vscode.commands.executeCommand('setContext', 'mpyWorkbench.hasPort', has);
+        vscode.commands.executeCommand("setContext", "mpyWorkbench.hasPort", has);
     };
     // Ensure no port is selected at startup
-    vscode.workspace.getConfiguration().update("mpyWorkbench.connect", "auto", vscode.ConfigurationTarget.Global);
+    vscode.workspace
+        .getConfiguration()
+        .update("mpyWorkbench.connect", "auto", vscode.ConfigurationTarget.Global);
     updatePortContext();
     const tree = new esp32Fs_1.Esp32Tree();
-    const view = vscode.window.createTreeView("mpyWorkbenchFsView", { treeDataProvider: tree });
+    const view = vscode.window.createTreeView("mpyWorkbenchFsView", {
+        treeDataProvider: tree,
+    });
     const actionsTree = new actions_1.ActionsTree();
-    const actionsView = vscode.window.createTreeView("mpyWorkbenchActionsView", { treeDataProvider: actionsTree });
+    const actionsView = vscode.window.createTreeView("mpyWorkbenchActionsView", {
+        treeDataProvider: actionsTree,
+    });
     const syncTree = new syncView_1.SyncTree();
-    const syncView = vscode.window.createTreeView("mpyWorkbenchSyncView", { treeDataProvider: syncTree });
-    const usageTree = new usageView_1.UsageTree();
-    const usageView = vscode.window.createTreeView("mpyWorkbenchUsageView", { treeDataProvider: usageTree });
+    const syncView = vscode.window.createTreeView("mpyWorkbenchSyncView", {
+        treeDataProvider: syncTree,
+    });
+    const infoTree = new infoView_1.InfoTree();
+    const usageView = vscode.window.createTreeView("mpyWorkbenchUsageView", {
+        treeDataProvider: infoTree,
+    });
     const decorations = new decorations_1.Esp32DecorationProvider();
     context.subscriptions.push(vscode.window.registerFileDecorationProvider(decorations));
     // Export decorations for use in other modules
@@ -177,10 +191,10 @@ function activate(context) {
     const boardOperations = new boardOperations_1.BoardOperations(tree, decorations);
     // Status bar item for canceling all tasks
     const cancelTasksStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
-    cancelTasksStatus.command = 'mpyWorkbench.cancelAllTasks';
-    cancelTasksStatus.tooltip = 'Cancel all running tasks';
-    cancelTasksStatus.text = 'MPY: Cancel';
-    cancelTasksStatus.color = new vscode.ThemeColor('statusBarItem.warningForeground');
+    cancelTasksStatus.command = "mpyWorkbench.cancelAllTasks";
+    cancelTasksStatus.tooltip = "Cancel all running tasks";
+    cancelTasksStatus.text = "MPY: Cancel";
+    cancelTasksStatus.color = new vscode.ThemeColor("statusBarItem.warningForeground");
     context.subscriptions.push(cancelTasksStatus);
     // Watch for workspace config changes in .mpystudio/config.json to update the status
     // Initialize status bar on activation
@@ -196,7 +210,9 @@ function activate(context) {
     let opQueue = Promise.resolve();
     let listingInProgress = false;
     let skipIdleOnce = false;
-    function setSkipIdleOnce() { skipIdleOnce = true; }
+    function setSkipIdleOnce() {
+        skipIdleOnce = true;
+    }
     async function ensureIdle() {
         // Keep this lightweight: do not chain kill/ctrl-c automatically.
         // Optionally perform a quick check to nudge the connection.
@@ -205,13 +221,17 @@ function activate(context) {
         }
         catch { }
         if (listingInProgress) {
-            const d = vscode.workspace.getConfiguration().get("mpyWorkbench.preListDelayMs", 150);
+            const d = vscode.workspace
+                .getConfiguration()
+                .get("mpyWorkbench.preListDelayMs", 150);
             if (d > 0)
-                await new Promise(r => setTimeout(r, d));
+                await new Promise((r) => setTimeout(r, d));
         }
     }
     async function withAutoSuspend(fn, opts = {}) {
-        const enabled = vscode.workspace.getConfiguration().get("mpyWorkbench.serialAutoSuspend", true);
+        const enabled = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.serialAutoSuspend", true);
         // Optionally preempt any in-flight mpremote process so new command takes priority
         if (opts.preempt !== false) {
             opQueue = Promise.resolve();
@@ -222,9 +242,12 @@ function activate(context) {
             try {
                 return await fn();
             }
-            finally { }
+            finally {
+            }
         }
-        opQueue = opQueue.catch(() => { }).then(async () => {
+        opQueue = opQueue
+            .catch(() => { })
+            .then(async () => {
             const wasOpen = (0, mpremoteCommands_1.isReplOpen)();
             if (wasOpen)
                 await (0, mpremoteCommands_1.disconnectReplTerminal)();
@@ -245,7 +268,7 @@ function activate(context) {
         tree.enableRawListForNext();
         tree.refreshTree();
     }), vscode.commands.registerCommand("mpyWorkbench.refreshUsage", () => {
-        usageTree.refreshTree();
+        infoTree.refreshTree();
     }), vscode.commands.registerCommand("mpyWorkbench.refreshFileTreeCache", async () => {
         try {
             console.log("[DEBUG] Starting manual file tree cache refresh...");
@@ -320,18 +343,25 @@ function activate(context) {
         const devices = await mp.listSerialPorts();
         const items = [
             { label: "auto", description: "Auto-detect device" },
-            ...devices.map(d => ({ label: d.port, description: d.name || "serial port" }))
+            ...devices.map((d) => ({
+                label: d.port,
+                description: d.name || "serial port",
+            })),
         ];
-        const picked = await vscode.window.showQuickPick(items, { placeHolder: "Select Board serial port" });
+        const picked = await vscode.window.showQuickPick(items, {
+            placeHolder: "Select Board serial port",
+        });
         if (!picked)
             return;
         const value = picked.label === "auto" ? "auto" : picked.label;
-        await vscode.workspace.getConfiguration().update("mpyWorkbench.connect", value, vscode.ConfigurationTarget.Global);
+        await vscode.workspace
+            .getConfiguration()
+            .update("mpyWorkbench.connect", value, vscode.ConfigurationTarget.Global);
         updatePortContext();
         vscode.window.showInformationMessage(`Board connect set to ${value}`);
         tree.clearCache();
         tree.refreshTree();
-        usageTree.refreshTree();
+        infoTree.refreshTree();
         // (no prompt) just refresh the tree after selecting port
     }), vscode.commands.registerCommand("mpyWorkbench.serialSendCtrlC", mpremoteCommands_1.serialSendCtrlC), vscode.commands.registerCommand("mpyWorkbench.stop", mpremoteCommands_1.stop), vscode.commands.registerCommand("mpyWorkbench.softReset", mpremoteCommands_1.softReset), vscode.commands.registerCommand("mpyWorkbench.newFileBoardAndLocal", async () => {
         const ws = vscode.workspace.workspaceFolders?.[0];
@@ -339,10 +369,12 @@ function activate(context) {
             vscode.window.showErrorMessage("No workspace folder open");
             return;
         }
-        const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         const filename = await vscode.window.showInputBox({
             prompt: "New file name (relative to project root)",
-            placeHolder: "main.py, lib/utils.py, ..."
+            placeHolder: "main.py, lib/utils.py, ...",
         });
         if (!filename || filename.endsWith("/"))
             return;
@@ -363,11 +395,13 @@ function activate(context) {
         const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
             if (savedDoc.uri.fsPath !== abs)
                 return;
-            const devicePath = (rootPath === "/" ? "/" : rootPath.replace(/\/$/, "")) + "/" + filename.replace(/^\/+/, "");
+            const devicePath = (rootPath === "/" ? "/" : rootPath.replace(/\/$/, "")) +
+                "/" +
+                filename.replace(/^\/+/, "");
             try {
                 const matcher = await (0, sync_1.createIgnoreMatcher)(ws.uri.fsPath);
                 const rel = filename.replace(/^\/+/, "");
-                if (matcher(rel.replace(/\\/g, '/'), false)) {
+                if (matcher(rel.replace(/\\/g, "/"), false)) {
                     vscode.window.showInformationMessage(`File saved (ignored for upload): ${filename}`);
                 }
                 else {
@@ -392,7 +426,9 @@ function activate(context) {
             return;
         try {
             const ws = getWorkspaceFolder();
-            const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+            const rootPath = vscode.workspace
+                .getConfiguration()
+                .get("mpyWorkbench.rootPath", "/");
             const rel = (0, mpremoteCommands_1.toLocalRelative)(node.path, rootPath);
             const abs = path.join(ws.uri.fsPath, ...rel.split("/"));
             await fs.access(abs);
@@ -410,7 +446,9 @@ function activate(context) {
             vscode.window.showErrorMessage("No workspace folder open");
             return;
         }
-        const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         const rel = (0, mpremoteCommands_1.toLocalRelative)(node.path, rootPath);
         const abs = path.join(ws.uri.fsPath, ...rel.split("/"));
         try {
@@ -434,7 +472,9 @@ function activate(context) {
             vscode.window.showErrorMessage("No workspace folder open");
             return;
         }
-        const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         const rel = (0, mpremoteCommands_1.toLocalRelative)(node.path, rootPath);
         const abs = path.join(ws.uri.fsPath, ...rel.split("/"));
         await fs.mkdir(path.dirname(abs), { recursive: true });
@@ -447,7 +487,9 @@ function activate(context) {
         }
         catch { }
     }), vscode.commands.registerCommand("mpyWorkbench.setPort", async (port) => {
-        await vscode.workspace.getConfiguration().update("mpyWorkbench.connect", port, vscode.ConfigurationTarget.Global);
+        await vscode.workspace
+            .getConfiguration()
+            .update("mpyWorkbench.connect", port, vscode.ConfigurationTarget.Global);
         updatePortContext();
         vscode.window.showInformationMessage(`ESP32 connect set to ${port}`);
         tree.clearCache();
@@ -458,7 +500,7 @@ function activate(context) {
             // Close the REPL terminal if open to avoid port conflicts
             if ((0, mpremoteCommands_1.isReplOpen)()) {
                 await (0, mpremoteCommands_1.disconnectReplTerminal)();
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise((r) => setTimeout(r, 400));
             }
             const ws = vscode.workspace.workspaceFolders?.[0];
             if (!ws) {
@@ -478,34 +520,45 @@ function activate(context) {
                 await (0, sync_1.saveManifest)(manifestPath, initialManifest);
                 vscode.window.showInformationMessage("Local folder initialized for synchronization.");
             }
-            const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+            const rootPath = vscode.workspace
+                .getConfiguration()
+                .get("mpyWorkbench.rootPath", "/");
             const matcher2 = await (0, sync_1.createIgnoreMatcher)(ws.uri.fsPath);
             const man = await (0, sync_1.buildManifest)(ws.uri.fsPath, matcher2);
             // Upload all files with progress using single mpremote fs cp command
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: "Uploading all files to board...",
-                cancellable: false
+                cancellable: false,
             }, async (progress, token) => {
                 const files = Object.keys(man.files);
                 const total = files.length;
                 if (total === 0) {
-                    progress.report({ increment: 100, message: "No files to upload" });
+                    progress.report({
+                        increment: 100,
+                        message: "No files to upload",
+                    });
                     return;
                 }
-                progress.report({ increment: 0, message: `Found ${total} files to upload` });
+                progress.report({
+                    increment: 0,
+                    message: `Found ${total} files to upload`,
+                });
                 await withAutoSuspend(async () => {
                     // First, create all necessary directories on the device in hierarchical order
-                    progress.report({ increment: 5, message: "Creating directories on device..." });
+                    progress.report({
+                        increment: 5,
+                        message: "Creating directories on device...",
+                    });
                     // Collect all unique directory paths that need to be created
                     const allDirectories = new Set();
                     for (const relativePath of files) {
                         const devicePath = path.posix.join(rootPath, relativePath);
                         const deviceDir = path.posix.dirname(devicePath);
-                        if (deviceDir !== '.' && deviceDir !== rootPath) {
+                        if (deviceDir !== "." && deviceDir !== rootPath) {
                             // Add all parent directories to the set
                             let currentDir = deviceDir;
-                            while (currentDir !== rootPath && currentDir !== '/') {
+                            while (currentDir !== rootPath && currentDir !== "/") {
                                 allDirectories.add(currentDir);
                                 currentDir = path.posix.dirname(currentDir);
                             }
@@ -513,8 +566,8 @@ function activate(context) {
                     }
                     // Sort directories by depth (shallowest first) to ensure parent directories are created before children
                     const sortedDirectories = Array.from(allDirectories).sort((a, b) => {
-                        const depthA = a.split('/').filter(p => p).length;
-                        const depthB = b.split('/').filter(p => p).length;
+                        const depthA = a.split("/").filter((p) => p).length;
+                        const depthB = b.split("/").filter((p) => p).length;
                         return depthA - depthB;
                     });
                     console.log(`[DEBUG] syncBaseline: Need to create ${sortedDirectories.length} directories:`, sortedDirectories);
@@ -544,7 +597,7 @@ function activate(context) {
                                 }
                                 else {
                                     // Wait a bit before retrying
-                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                    await new Promise((resolve) => setTimeout(resolve, 100));
                                 }
                             }
                         }
@@ -607,12 +660,15 @@ function activate(context) {
                         }
                         if (stillMissing.length > 0) {
                             console.error(`[DEBUG] syncBaseline: Still missing ${stillMissing.length} directories after retry:`, stillMissing);
-                            throw new Error(`Missing directories after retry: ${stillMissing.join(', ')}`);
+                            throw new Error(`Missing directories after retry: ${stillMissing.join(", ")}`);
                         }
                         console.log(`[DEBUG] syncBaseline: ✓ All directories now exist after retry`);
                     }
                     console.log(`[DEBUG] syncBaseline: ✓ All directories verified - proceeding with bulk upload`);
-                    progress.report({ increment: 10, message: "Starting bulk upload..." });
+                    progress.report({
+                        increment: 10,
+                        message: "Starting bulk upload...",
+                    });
                     // Use individual cp commands instead of bulk upload
                     console.log(`[DEBUG] syncBaseline: Using individual cp commands for upload`);
                     // Verify all local files exist before building command
@@ -659,8 +715,8 @@ function activate(context) {
                         try {
                             console.log(`[DEBUG] syncBaseline: Individual upload ${uploaded + 1}/${actualTotal}: ${localPath} -> ${devicePath}`);
                             progress.report({
-                                increment: (80 / actualTotal),
-                                message: `Uploading ${relativePath} (${uploaded + 1}/${actualTotal})`
+                                increment: 80 / actualTotal,
+                                message: `Uploading ${relativePath} (${uploaded + 1}/${actualTotal})`,
                             });
                             // Use cpToDevice which includes directory creation logic
                             console.log(`[DEBUG] syncBaseline: Executing cpToDevice: ${localPath} -> ${devicePath}`);
@@ -680,7 +736,10 @@ function activate(context) {
                     if (failed > 0) {
                         console.warn(`[DEBUG] syncBaseline: ${failed} files failed to upload individually`);
                     }
-                    progress.report({ increment: 100, message: "All files uploaded successfully" });
+                    progress.report({
+                        increment: 100,
+                        message: "All files uploaded successfully",
+                    });
                 });
             });
             // Save manifest locally only (no device manifest to avoid .mpy-workbench folder on board)
@@ -699,30 +758,38 @@ function activate(context) {
         // Close the REPL terminal if open to avoid port conflicts
         if ((0, mpremoteCommands_1.isReplOpen)()) {
             await (0, mpremoteCommands_1.disconnectReplTerminal)();
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise((r) => setTimeout(r, 400));
         }
         const ws = vscode.workspace.workspaceFolders?.[0];
         if (!ws) {
             vscode.window.showErrorMessage("No workspace folder open");
             return;
         }
-        const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         const deviceStats = await withAutoSuspend(() => mp.listTreeStats(rootPath));
         const matcher = await (0, sync_1.createIgnoreMatcher)(ws.uri.fsPath);
         const toDownload = deviceStats
-            .filter(stat => !stat.isDir)
-            .filter(stat => {
+            .filter((stat) => !stat.isDir)
+            .filter((stat) => {
             const rel = (0, mpremoteCommands_1.toLocalRelative)(stat.path, rootPath);
             return !matcher(rel, false);
         });
-        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Board: Sync all files (Board → Local)", cancellable: false }, async (progress) => {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Board: Sync all files (Board → Local)",
+            cancellable: false,
+        }, async (progress) => {
             let done = 0;
             const total = toDownload.length;
             await withAutoSuspend(async () => {
                 for (const stat of toDownload) {
                     const rel = (0, mpremoteCommands_1.toLocalRelative)(stat.path, rootPath);
                     const abs = path.join(ws.uri.fsPath, ...rel.split("/"));
-                    progress.report({ message: `Downloading ${rel} (${++done}/${total})` });
+                    progress.report({
+                        message: `Downloading ${rel} (${++done}/${total})`,
+                    });
                     await fs.mkdir(path.dirname(abs), { recursive: true });
                     await mp.cpFromDevice(stat.path, abs);
                     tree.addNode(stat.path, false); // Add downloaded file to tree
@@ -742,7 +809,9 @@ function activate(context) {
     }), vscode.commands.registerCommand("mpyWorkbench.autoSuspendLs", async (pathArg) => {
         listingInProgress = true;
         try {
-            const usePyRaw = vscode.workspace.getConfiguration().get("mpyWorkbench.usePyRawList", false);
+            const usePyRaw = vscode.workspace
+                .getConfiguration()
+                .get("mpyWorkbench.usePyRawList", false);
             return await withAutoSuspend(() => (usePyRaw ? (0, pyraw_1.listDirPyRaw)(pathArg) : mp.lsTyped(pathArg)), { preempt: false });
         }
         finally {
@@ -750,8 +819,8 @@ function activate(context) {
         }
     }), 
     // Keep welcome button visibility in sync if user changes settings directly
-    vscode.workspace.onDidChangeConfiguration(e => {
-        if (e.affectsConfiguration('mpyWorkbench.connect'))
+    vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("mpyWorkbench.connect"))
             updatePortContext();
     }), vscode.commands.registerCommand("mpyWorkbench.uploadActiveFile", async () => {
         const ed = vscode.window.activeTextEditor;
@@ -761,11 +830,13 @@ function activate(context) {
         }
         await ed.document.save();
         const ws = vscode.workspace.getWorkspaceFolder(ed.document.uri);
-        const rel = ws ? path.relative(ws.uri.fsPath, ed.document.uri.fsPath) : path.basename(ed.document.uri.fsPath);
+        const rel = ws
+            ? path.relative(ws.uri.fsPath, ed.document.uri.fsPath)
+            : path.basename(ed.document.uri.fsPath);
         if (ws) {
             try {
                 const matcher = await (0, sync_1.createIgnoreMatcher)(ws.uri.fsPath);
-                const relPosix = rel.replace(/\\\\/g, '/');
+                const relPosix = rel.replace(/\\\\/g, "/");
                 if (matcher(relPosix, false)) {
                     vscode.window.showInformationMessage(`Upload skipped (ignored): ${relPosix}`);
                     return;
@@ -804,7 +875,9 @@ function activate(context) {
             await (0, sync_1.saveManifest)(manifestPath, initialManifest);
             vscode.window.showInformationMessage("Local folder initialized for synchronization.");
         }
-        const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         // Get current diffs and filter to files by comparing with current device stats
         // Check if differences have been detected first
         const allDiffs = decorations.getDiffsFilesOnly();
@@ -826,8 +899,10 @@ function activate(context) {
             }
         }
         const deviceStats = await withAutoSuspend(() => mp.listTreeStats(rootPath));
-        const filesSet = new Set(deviceStats.filter(e => !e.isDir).map(e => e.path));
-        const diffs = decorations.getDiffsFilesOnly().filter(p => filesSet.has(p));
+        const filesSet = new Set(deviceStats.filter((e) => !e.isDir).map((e) => e.path));
+        const diffs = decorations
+            .getDiffsFilesOnly()
+            .filter((p) => filesSet.has(p));
         const localOnlyFiles = decorations.getLocalOnlyFilesOnly();
         // Debug: Log what sync found
         console.log("Debug - syncDiffsLocalToBoard:");
@@ -840,13 +915,17 @@ function activate(context) {
             vscode.window.showInformationMessage("Board: No diffed files to sync");
             return;
         }
-        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Board: Sync Files Local → Board", cancellable: false }, async (progress) => {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Board: Sync Files Local → Board",
+            cancellable: false,
+        }, async (progress) => {
             let done = 0;
             const total = allFilesToSync.length;
             await withAutoSuspend(async () => {
                 for (const devicePath of allFilesToSync) {
                     const rel = (0, mpremoteCommands_1.toLocalRelative)(devicePath, rootPath);
-                    const abs = path.join(ws.uri.fsPath, ...rel.split('/'));
+                    const abs = path.join(ws.uri.fsPath, ...rel.split("/"));
                     try {
                         await fs.access(abs);
                         // Check if it's a directory and skip it
@@ -861,7 +940,9 @@ function activate(context) {
                     }
                     const isLocalOnly = localOnlyFiles.includes(devicePath);
                     const action = isLocalOnly ? "Uploading (new)" : "Uploading";
-                    progress.report({ message: `${action} ${rel} (${++done}/${total})` });
+                    progress.report({
+                        message: `${action} ${rel} (${++done}/${total})`,
+                    });
                     await mp.uploadReplacing(abs, devicePath);
                     tree.addNode(devicePath, false); // Add uploaded file to tree
                 }
@@ -894,11 +975,15 @@ function activate(context) {
             await (0, sync_1.saveManifest)(manifestPath, initialManifest);
             vscode.window.showInformationMessage("Local folder initialized for synchronization.");
         }
-        const rootPath2 = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath2 = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         // Get current diffs and filter to files by comparing with current device stats
         const deviceStats2 = await withAutoSuspend(() => mp.listTreeStats(rootPath2));
-        const filesSet2 = new Set(deviceStats2.filter(e => !e.isDir).map(e => e.path));
-        const diffs2 = decorations.getDiffsFilesOnly().filter(p => filesSet2.has(p));
+        const filesSet2 = new Set(deviceStats2.filter((e) => !e.isDir).map((e) => e.path));
+        const diffs2 = decorations
+            .getDiffsFilesOnly()
+            .filter((p) => filesSet2.has(p));
         if (diffs2.length === 0) {
             const localOnlyFiles = decorations.getLocalOnly();
             if (localOnlyFiles.length > 0) {
@@ -915,10 +1000,14 @@ function activate(context) {
             }
             return;
         }
-        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Board: Sync Diffed Files Board → Local", cancellable: false }, async (progress) => {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Board: Sync Diffed Files Board → Local",
+            cancellable: false,
+        }, async (progress) => {
             let done = 0;
             const matcher = await (0, sync_1.createIgnoreMatcher)(ws2.uri.fsPath);
-            const filtered = diffs2.filter(devicePath => {
+            const filtered = diffs2.filter((devicePath) => {
                 const rel = (0, mpremoteCommands_1.toLocalRelative)(devicePath, rootPath2);
                 return !matcher(rel, false);
             });
@@ -926,8 +1015,10 @@ function activate(context) {
             await withAutoSuspend(async () => {
                 for (const devicePath of filtered) {
                     const rel = (0, mpremoteCommands_1.toLocalRelative)(devicePath, rootPath2);
-                    const abs = path.join(ws2.uri.fsPath, ...rel.split('/'));
-                    progress.report({ message: `Downloading ${rel} (${++done}/${total})` });
+                    const abs = path.join(ws2.uri.fsPath, ...rel.split("/"));
+                    progress.report({
+                        message: `Downloading ${rel} (${++done}/${total})`,
+                    });
                     await fs.mkdir(path.dirname(abs), { recursive: true });
                     await mp.cpFromDevice(devicePath, abs);
                     tree.addNode(devicePath, false); // Add downloaded file to tree
@@ -941,7 +1032,9 @@ function activate(context) {
         if (node.kind !== "file")
             return;
         const ws = vscode.workspace.workspaceFolders?.[0];
-        const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         if (ws) {
             const rel = (0, mpremoteCommands_1.toLocalRelative)(node.path, rootPath);
             const abs = path.join(ws.uri.fsPath, ...rel.split("/"));
@@ -954,7 +1047,10 @@ function activate(context) {
             }
             else {
                 // For files that should exist on board, check if present locally first
-                const fileExistsLocally = await fs.access(abs).then(() => true).catch(() => false);
+                const fileExistsLocally = await fs
+                    .access(abs)
+                    .then(() => true)
+                    .catch(() => false);
                 if (!fileExistsLocally) {
                     console.log(`[DEBUG] openFile (extension): File not found locally, copying from board: ${node.path} -> ${abs}`);
                     try {
@@ -991,8 +1087,15 @@ function activate(context) {
             }
         }
     }), vscode.commands.registerCommand("mpyWorkbench.mkdir", async (node) => {
-        const base = node?.kind === "dir" ? node.path : (node ? path.posix.dirname(node.path) : "/");
-        const name = await vscode.window.showInputBox({ prompt: "New folder name", validateInput: v => v ? undefined : "Required" });
+        const base = node?.kind === "dir"
+            ? node.path
+            : node
+                ? path.posix.dirname(node.path)
+                : "/";
+        const name = await vscode.window.showInputBox({
+            prompt: "New folder name",
+            validateInput: (v) => (v ? undefined : "Required"),
+        });
         if (!name)
             return;
         const target = base === "/" ? `/${name}` : `${base}/${name}`;
@@ -1006,15 +1109,21 @@ function activate(context) {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: `Deleting ${node.path}...`,
-            cancellable: false
+            cancellable: false,
         }, async (progress, token) => {
             progress.report({ increment: 0, message: "Starting deletion..." });
             try {
                 // Fast path: one-shot delete (file or directory)
                 const isDir = node.kind === "dir";
-                progress.report({ increment: 60, message: isDir ? "Removing directory..." : "Removing file..." });
+                progress.report({
+                    increment: 60,
+                    message: isDir ? "Removing directory..." : "Removing file...",
+                });
                 await withAutoSuspend(() => mp.deleteAny(node.path));
-                progress.report({ increment: 100, message: "Deletion complete!" });
+                progress.report({
+                    increment: 100,
+                    message: "Deletion complete!",
+                });
                 vscode.window.showInformationMessage(`Successfully deleted ${node.path} from board`);
                 tree.removeNode(node.path);
             }
@@ -1031,26 +1140,39 @@ function activate(context) {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: `Deleting ${node.path} from board and local...`,
-            cancellable: false
+            cancellable: false,
         }, async (progress, token) => {
             progress.report({ increment: 0, message: "Starting deletion..." });
             try {
                 // Fast path: one-shot delete on board
                 const isDir = node.kind === "dir";
-                progress.report({ increment: 50, message: isDir ? "Removing directory from board..." : "Removing file from board..." });
+                progress.report({
+                    increment: 50,
+                    message: isDir
+                        ? "Removing directory from board..."
+                        : "Removing file from board...",
+                });
                 await withAutoSuspend(() => mp.deleteAny(node.path));
-                progress.report({ increment: 70, message: "Board deletion complete!" });
+                progress.report({
+                    increment: 70,
+                    message: "Board deletion complete!",
+                });
                 vscode.window.showInformationMessage(`Successfully deleted ${node.path} from board`);
                 tree.removeNode(node.path);
             }
             catch (err) {
-                progress.report({ increment: 70, message: "Board deletion failed!" });
+                progress.report({
+                    increment: 70,
+                    message: "Board deletion failed!",
+                });
                 vscode.window.showErrorMessage(`Failed to delete ${node.path} from board: ${err?.message ?? String(err)}`);
             }
         });
         const ws = vscode.workspace.workspaceFolders?.[0];
         if (ws) {
-            const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+            const rootPath = vscode.workspace
+                .getConfiguration()
+                .get("mpyWorkbench.rootPath", "/");
             const rel = (0, mpremoteCommands_1.toLocalRelative)(node.path, rootPath);
             const abs = path.join(ws.uri.fsPath, ...rel.split("/"));
             try {
@@ -1060,7 +1182,9 @@ function activate(context) {
         }
         tree.removeNode(node.path);
     }), vscode.commands.registerCommand("mpyWorkbench.deleteAllBoard", async () => {
-        const rootPath = vscode.workspace.getConfiguration().get("mpyWorkbench.rootPath", "/");
+        const rootPath = vscode.workspace
+            .getConfiguration()
+            .get("mpyWorkbench.rootPath", "/");
         const warn = await vscode.window.showWarningMessage(`This will DELETE ALL files and folders under '${rootPath}' on the board. This cannot be undone.`, { modal: true }, "Delete All");
         if (warn !== "Delete All")
             return;
@@ -1068,7 +1192,7 @@ function activate(context) {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: `Deleting all files from ${rootPath}...`,
-            cancellable: false
+            cancellable: false,
         }, async (progress, token) => {
             progress.report({ increment: 0, message: "Scanning board files..." });
             try {
@@ -1076,14 +1200,23 @@ function activate(context) {
                 const items = await withAutoSuspend(() => mp.listTreeStats(rootPath));
                 const totalItems = items.length;
                 if (totalItems === 0) {
-                    progress.report({ increment: 100, message: "No files to delete!" });
+                    progress.report({
+                        increment: 100,
+                        message: "No files to delete!",
+                    });
                     vscode.window.showInformationMessage(`Board: No files found under ${rootPath}`);
                     return;
                 }
-                progress.report({ increment: 20, message: `Found ${totalItems} items to delete...` });
+                progress.report({
+                    increment: 20,
+                    message: `Found ${totalItems} items to delete...`,
+                });
                 // Usar nuestra nueva función para eliminar todo
                 const result = await withAutoSuspend(() => mp.deleteAllInPath(rootPath));
-                progress.report({ increment: 80, message: "Verifying deletion..." });
+                progress.report({
+                    increment: 80,
+                    message: "Verifying deletion...",
+                });
                 // Verificar lo que queda
                 const remaining = await withAutoSuspend(() => mp.listTreeStats(rootPath));
                 progress.report({ increment: 100, message: "Deletion complete!" });
@@ -1122,23 +1255,50 @@ function activate(context) {
             const msg = e?.message ?? String(e);
             vscode.window.showErrorMessage(`Board command failed: ${msg}`);
         }
-    }), vscode.commands.registerCommand("mpyWorkbench.syncBaselineFromView", async () => { setSkipIdleOnce(); await vscode.commands.executeCommand("mpyWorkbench.syncBaseline"); }), vscode.commands.registerCommand("mpyWorkbench.syncBaselineFromBoardFromView", async () => { setSkipIdleOnce(); await vscode.commands.executeCommand("mpyWorkbench.syncBaselineFromBoard"); }), vscode.commands.registerCommand("mpyWorkbench.checkDiffsFromView", async () => { setSkipIdleOnce(); await vscode.commands.executeCommand("mpyWorkbench.checkDiffs"); }), vscode.commands.registerCommand("mpyWorkbench.syncDiffsLocalToBoardFromView", async () => { setSkipIdleOnce(); await vscode.commands.executeCommand("mpyWorkbench.syncDiffsLocalToBoard"); }), vscode.commands.registerCommand("mpyWorkbench.syncDiffsBoardToLocalFromView", async () => { setSkipIdleOnce(); await vscode.commands.executeCommand("mpyWorkbench.syncDiffsBoardToLocal"); }), vscode.commands.registerCommand("mpyWorkbench.runActiveFileFromView", async () => { setSkipIdleOnce(); await vscode.commands.executeCommand("mpyWorkbench.runActiveFile"); }), vscode.commands.registerCommand("mpyWorkbench.openReplFromView", async () => { setSkipIdleOnce(); await vscode.commands.executeCommand("mpyWorkbench.openRepl"); }), vscode.commands.registerCommand("mpyWorkbench.newFileInTree", async (node) => {
+    }), vscode.commands.registerCommand("mpyWorkbench.syncBaselineFromView", async () => {
+        setSkipIdleOnce();
+        await vscode.commands.executeCommand("mpyWorkbench.syncBaseline");
+    }), vscode.commands.registerCommand("mpyWorkbench.syncBaselineFromBoardFromView", async () => {
+        setSkipIdleOnce();
+        await vscode.commands.executeCommand("mpyWorkbench.syncBaselineFromBoard");
+    }), vscode.commands.registerCommand("mpyWorkbench.checkDiffsFromView", async () => {
+        setSkipIdleOnce();
+        await vscode.commands.executeCommand("mpyWorkbench.checkDiffs");
+    }), vscode.commands.registerCommand("mpyWorkbench.syncDiffsLocalToBoardFromView", async () => {
+        setSkipIdleOnce();
+        await vscode.commands.executeCommand("mpyWorkbench.syncDiffsLocalToBoard");
+    }), vscode.commands.registerCommand("mpyWorkbench.syncDiffsBoardToLocalFromView", async () => {
+        setSkipIdleOnce();
+        await vscode.commands.executeCommand("mpyWorkbench.syncDiffsBoardToLocal");
+    }), vscode.commands.registerCommand("mpyWorkbench.runActiveFileFromView", async () => {
+        setSkipIdleOnce();
+        await vscode.commands.executeCommand("mpyWorkbench.runActiveFile");
+    }), vscode.commands.registerCommand("mpyWorkbench.openReplFromView", async () => {
+        setSkipIdleOnce();
+        await vscode.commands.executeCommand("mpyWorkbench.openRepl");
+    }), vscode.commands.registerCommand("mpyWorkbench.newFileInTree", async (node) => {
         const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!ws)
             return;
         // Determine base path on device
         const baseDevice = node
-            ? (node.kind === "dir" ? node.path : path.posix.dirname(node.path))
+            ? node.kind === "dir"
+                ? node.path
+                : path.posix.dirname(node.path)
             : "/";
         const baseLabel = baseDevice === "/" ? "/" : baseDevice;
         const newName = await vscode.window.showInputBox({
             prompt: `New file name (in ${baseLabel})`,
             placeHolder: "filename.ext or subfolder/filename.ext",
-            validateInput: v => v && !v.endsWith("/") && !v.endsWith("\\") ? undefined : "Name must not end with / and cannot be empty"
+            validateInput: (v) => v && !v.endsWith("/") && !v.endsWith("\\")
+                ? undefined
+                : "Name must not end with / and cannot be empty",
         });
         if (!newName)
             return;
-        const devicePath = baseDevice === "/" ? `/${newName.replace(/^\//, "")}` : `${baseDevice}/${newName.replace(/^\//, "")}`;
+        const devicePath = baseDevice === "/"
+            ? `/${newName.replace(/^\//, "")}`
+            : `${baseDevice}/${newName.replace(/^\//, "")}`;
         try {
             // Create locally first
             const relLocal = devicePath.replace(/^\//, "");
@@ -1164,17 +1324,23 @@ function activate(context) {
         if (!ws)
             return;
         const baseDevice = node
-            ? (node.kind === "dir" ? node.path : path.posix.dirname(node.path))
+            ? node.kind === "dir"
+                ? node.path
+                : path.posix.dirname(node.path)
             : "/";
         const baseLabel = baseDevice === "/" ? "/" : baseDevice;
         const newName = await vscode.window.showInputBox({
             prompt: `New folder name (in ${baseLabel})`,
             placeHolder: "folder or subfolder/name",
-            validateInput: v => v && !v.endsWith(".") && !v.endsWith("/") && !v.endsWith("\\") ? undefined : "Name must not end with / and cannot be empty"
+            validateInput: (v) => v && !v.endsWith(".") && !v.endsWith("/") && !v.endsWith("\\")
+                ? undefined
+                : "Name must not end with / and cannot be empty",
         });
         if (!newName)
             return;
-        const devicePath = baseDevice === "/" ? `/${newName.replace(/^\//, "")}` : `${baseDevice}/${newName.replace(/^\//, "")}`;
+        const devicePath = baseDevice === "/"
+            ? `/${newName.replace(/^\//, "")}`
+            : `${baseDevice}/${newName.replace(/^\//, "")}`;
         try {
             await mp.mkdir(devicePath);
             const relLocal = devicePath.replace(/^\//, "");
@@ -1196,7 +1362,9 @@ function activate(context) {
         const newName = await vscode.window.showInputBox({
             prompt: `New name for ${oldName}`,
             value: oldName,
-            validateInput: v => v && v !== oldName ? undefined : "Name must be different and not empty"
+            validateInput: (v) => v && v !== oldName
+                ? undefined
+                : "Name must be different and not empty",
         });
         if (!newName || newName === oldName)
             return;
@@ -1225,7 +1393,8 @@ function activate(context) {
         }
         vscode.window.showInformationMessage(`Renamed: ${oldPath} → ${newPath}`);
         // Refresh tree
-        const tree = vscode.extensions.getExtension("DanielBucam.mpy-workbench")?.exports?.esp32Tree;
+        const tree = vscode.extensions.getExtension("DanielBucam.mpy-workbench")
+            ?.exports?.esp32Tree;
         if (tree && typeof tree.refreshTree === "function")
             tree.refreshTree();
         else

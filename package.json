@@ -85,8 +85,8 @@
         },
         {
           "id": "mpyWorkbenchUsageView",
-          "name": "Usage",
-          "icon": "$(database)"
+          "name": "Info",
+          "icon": "$(info)"
         }
       ]
     },
@@ -98,7 +98,7 @@
       },
       {
         "command": "mpyWorkbench.refreshUsage",
-        "title": "MPY Workbench: Refresh Usage",
+        "title": "MPY Workbench: Refresh Info",
         "icon": "$(refresh)"
       },
       {

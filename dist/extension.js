@@ -184,7 +184,7 @@ function activate(context) {
         treeDataProvider: infoTree,
     });
     const decorations = new decorations_1.Esp32DecorationProvider();
-    context.subscriptions.push(vscode.window.registerFileDecorationProvider(decorations));
+    context.subscriptions.push(vscode.window.registerFileDecorationProvider(decorations), infoTree);
     // Export decorations for use in other modules
     global.esp32Decorations = decorations;
     // Create BoardOperations instance

@@ -225,6 +225,7 @@ export function activate(context: vscode.ExtensionContext) {
   const decorations = new Esp32DecorationProvider();
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(decorations),
+    infoTree,
   );
   // Export decorations for use in other modules
   (global as any).esp32Decorations = decorations;

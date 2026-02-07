@@ -44,8 +44,8 @@ class Esp32Tree {
         item.contextValue = element.kind; // for menus
         item.resourceUri = vscode.Uri.parse(`esp32:${element.path}`);
         item.iconPath = element.kind === "dir"
-            ? { light: this.icon("folder.svg"), dark: this.icon("folder.svg") }
-            : { light: this.icon("file.svg"), dark: this.icon("file.svg") };
+            ? new vscode.ThemeIcon("folder")
+            : new vscode.ThemeIcon("file");
         if (element.kind === "file")
             item.command = {
                 command: "mpyWorkbench.openFile",

@@ -11,6 +11,7 @@ export interface InfoNode {
   label: string;
   description?: string;
   icon?: string;
+  iconColor?: string;
 }
 
 export interface EspInfo {
@@ -40,6 +41,11 @@ export class InfoTree implements vscode.TreeDataProvider<InfoNode> {
     this._onDidChangeTreeData.fire();
   }
 
+  dispose(): void {
+    this._onDidChangeTreeData.dispose();
+  }
+
+
   // Queue for serial operations
   private opQueue: Promise<any> = Promise.resolve();
   private skipIdleOnce = false;
@@ -53,7 +59,9 @@ export class InfoTree implements vscode.TreeDataProvider<InfoNode> {
       item.description = element.description;
     }
     if (element.icon) {
-      item.iconPath = new vscode.ThemeIcon(element.icon);
+      item.iconPath = element.iconColor 
+        ? new vscode.ThemeIcon(element.icon, new vscode.ThemeColor(element.iconColor))
+        : new vscode.ThemeIcon(element.icon);
     }
     item.tooltip = element.label;
     return item;
@@ -306,174 +314,218 @@ print('=' * 60)`;
   }
 
   async getInfoNodes(): Promise<InfoNode[]> {
-    try {
-      const espInfo = await this.getEspInfo();
-      console.log(espInfo);
-      const nodes: InfoNode[] = [];
+    const connect = vscode.workspace
+      .getConfiguration()
+      .get<string>("mpyWorkbench.connect", "auto");
+    const hasPort = !!connect && connect !== "auto";
+    let connected = false;
+    let errorMsg: string | undefined;
+    const nodes: InfoNode[] = [];
 
-      // Helper to format bytes to KB/MB
-      const formatBytes = (bytes: number): string => {
-        if (bytes >= 1024 * 1024) {
-          return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-        } else if (bytes >= 1024) {
-          return `${(bytes / 1024).toFixed(1)} KB`;
-        } else {
-          return `${bytes} bytes`;
+    // Helper to format bytes to KB/MB
+    const formatBytes = (bytes: number): string => {
+      if (bytes >= 1024 * 1024) {
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      } else if (bytes >= 1024) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+      } else {
+        return `${bytes} bytes`;
+      }
+    };
+
+    // Connection status node
+    if (!hasPort) {
+      nodes.push({
+        id: "connection",
+        label: "Board: No port selected",
+        description: "Select a serial port to connect",
+        icon: "circle-outline",
+        iconColor: "errorForeground",
+      });
+    } else {
+      try {
+        const espInfo = await this.getEspInfo();
+        connected = true;
+        // Connected successfully
+        nodes.push({
+          id: "connection",
+          label: `Board: Connected (${connect})`,
+          icon: "pass",
+          iconColor: "debugIcon.startForeground",
+        });
+
+        // Add all info nodes
+        if (espInfo.chipId !== undefined) {
+          nodes.push({
+            id: "chipId",
+            label: `Chip ID: ${espInfo.chipId}`,
+            icon: "circuit-board",
+            iconColor: "icon.foreground",
+          });
         }
-      };
 
-      // Chip ID
-      if (espInfo.chipId !== undefined) {
-        nodes.push({
-          id: "chipId",
-          label: `Chip ID: ${espInfo.chipId}`,
-          icon: "circuit-board",
-        });
-      }
+        if (espInfo.cpuFreq !== undefined) {
+          const mhz = espInfo.cpuFreq / 1000000;
+          nodes.push({
+            id: "cpuFreq",
+            label: `CPU Frequency: ${mhz.toFixed(0)} MHz`,
+            icon: "cpu",
+            iconColor: "icon.foreground",
+          });
+        }
 
-      // CPU Frequency
-      if (espInfo.cpuFreq !== undefined) {
-        const mhz = espInfo.cpuFreq / 1000000;
-        nodes.push({
-          id: "cpuFreq",
-          label: `CPU Frequency: ${mhz.toFixed(0)} MHz`,
-          icon: "cpu",
-        });
-      }
+        if (espInfo.flashSize !== undefined) {
+          nodes.push({
+            id: "flashSize",
+            label: `Flash Size: ${formatBytes(espInfo.flashSize)}`,
+            icon: "database",
+            iconColor: "icon.foreground",
+          });
+        }
 
-      // Flash Size
-      if (espInfo.flashSize !== undefined) {
-        nodes.push({
-          id: "flashSize",
-          label: `Flash Size: ${formatBytes(espInfo.flashSize)}`,
-          icon: "database",
-        });
-      }
+        if (espInfo.fsTotal !== undefined) {
+          nodes.push({
+            id: "fsTotal",
+            label: `Storage Total: ${formatBytes(espInfo.fsTotal)}`,
+            icon: "database",
+            iconColor: "icon.foreground",
+          });
+        }
+        if (espInfo.fsUsed !== undefined && espInfo.fsUsagePercent !== undefined) {
+          nodes.push({
+            id: "fsUsed",
+            label: `Storage Used: ${formatBytes(espInfo.fsUsed)} (${espInfo.fsUsagePercent.toFixed(1)}%)`,
+            description: espInfo.fsFree !== undefined ? `Free: ${formatBytes(espInfo.fsFree)}` : undefined,
+            icon: "circle-filled",
+            iconColor: "icon.foreground",
+          });
+        } else if (espInfo.fsUsed !== undefined) {
+          nodes.push({
+            id: "fsUsed",
+            label: `Storage Used: ${formatBytes(espInfo.fsUsed)}`,
+            icon: "circle-filled",
+            iconColor: "icon.foreground",
+          });
+        }
 
-      // Filesystem Info
-      if (espInfo.fsTotal !== undefined) {
-        nodes.push({
-          id: "fsTotal",
-          label: `Storage Total: ${formatBytes(espInfo.fsTotal)}`,
-          icon: "database",
-        });
-      }
-      if (espInfo.fsUsed !== undefined && espInfo.fsUsagePercent !== undefined) {
-        nodes.push({
-          id: "fsUsed",
-          label: `Storage Used: ${formatBytes(espInfo.fsUsed)} (${espInfo.fsUsagePercent.toFixed(1)}%)`,
-          description: espInfo.fsFree !== undefined ? `Free: ${formatBytes(espInfo.fsFree)}` : undefined,
-          icon: "circle-filled",
-        });
-      } else if (espInfo.fsUsed !== undefined) {
-        nodes.push({
-          id: "fsUsed",
-          label: `Storage Used: ${formatBytes(espInfo.fsUsed)}`,
-          icon: "circle-filled",
-        });
-      }
+        if (espInfo.micropythonVersion !== undefined) {
+          nodes.push({
+            id: "micropythonVersion",
+            label: `MicroPython: ${espInfo.micropythonVersion}`,
+            icon: "code",
+            iconColor: "icon.foreground",
+          });
+        }
 
-      // MicroPython Version
-      if (espInfo.micropythonVersion !== undefined) {
-        nodes.push({
-          id: "micropythonVersion",
-          label: `MicroPython: ${espInfo.micropythonVersion}`,
-          icon: "code",
-        });
-      }
+        if (espInfo.ramTotal !== undefined) {
+          nodes.push({
+            id: "ramTotal",
+            label: `RAM Total: ${formatBytes(espInfo.ramTotal)}`,
+            icon: "memory",
+            iconColor: "icon.foreground",
+          });
+        }
+        if (espInfo.ramAlloc !== undefined && espInfo.ramUsagePercent !== undefined) {
+          nodes.push({
+            id: "ramUsed",
+            label: `RAM Used: ${formatBytes(espInfo.ramAlloc)} (${espInfo.ramUsagePercent.toFixed(1)}%)`,
+            description: espInfo.ramFree !== undefined ? `Free: ${formatBytes(espInfo.ramFree)}` : undefined,
+            icon: "circle-filled",
+            iconColor: "icon.foreground",
+          });
+        } else if (espInfo.ramAlloc !== undefined) {
+          nodes.push({
+            id: "ramUsed",
+            label: `RAM Used: ${formatBytes(espInfo.ramAlloc)}`,
+            icon: "circle-filled",
+            iconColor: "icon.foreground",
+          });
+        }
 
-      // RAM Info
-      if (espInfo.ramTotal !== undefined) {
-        nodes.push({
-          id: "ramTotal",
-          label: `RAM Total: ${formatBytes(espInfo.ramTotal)}`,
-          icon: "memory",
-        });
-      }
-      if (espInfo.ramAlloc !== undefined && espInfo.ramUsagePercent !== undefined) {
-        nodes.push({
-          id: "ramUsed",
-          label: `RAM Used: ${formatBytes(espInfo.ramAlloc)} (${espInfo.ramUsagePercent.toFixed(1)}%)`,
-          description: espInfo.ramFree !== undefined ? `Free: ${formatBytes(espInfo.ramFree)}` : undefined,
-          icon: "circle-filled",
-        });
-      } else if (espInfo.ramAlloc !== undefined) {
-        nodes.push({
-          id: "ramUsed",
-          label: `RAM Used: ${formatBytes(espInfo.ramAlloc)}`,
-          icon: "circle-filled",
-        });
-      }
+        if (espInfo.temperatureC !== undefined && espInfo.temperatureF !== undefined) {
+          nodes.push({
+            id: "temperature",
+            label: `Temperature: ${espInfo.temperatureC.toFixed(1)}°C / ${espInfo.temperatureF.toFixed(1)}°F`,
+            icon: "flame",
+            iconColor: "icon.foreground",
+          });
+        } else if (espInfo.temperatureC !== undefined) {
+          nodes.push({
+            id: "temperature",
+            label: `Temperature: ${espInfo.temperatureC.toFixed(1)}°C`,
+            icon: "flame",
+            iconColor: "icon.foreground",
+          });
+        } else if (espInfo.temperatureF !== undefined) {
+          nodes.push({
+            id: "temperature",
+            label: `Temperature: ${espInfo.temperatureF.toFixed(1)}°F`,
+            icon: "flame",
+            iconColor: "icon.foreground",
+          });
+        }
 
-      // Temperature
-      if (espInfo.temperatureC !== undefined && espInfo.temperatureF !== undefined) {
-        nodes.push({
-          id: "temperature",
-          label: `Temperature: ${espInfo.temperatureC.toFixed(1)}°C / ${espInfo.temperatureF.toFixed(1)}°F`,
-          icon: "flame",
-        });
-      } else if (espInfo.temperatureC !== undefined) {
-        nodes.push({
-          id: "temperature",
-          label: `Temperature: ${espInfo.temperatureC.toFixed(1)}°C`,
-          icon: "flame",
-        });
-      } else if (espInfo.temperatureF !== undefined) {
-        nodes.push({
-          id: "temperature",
-          label: `Temperature: ${espInfo.temperatureF.toFixed(1)}°F`,
-          icon: "flame",
-        });
-      }
+        if (espInfo.hall !== undefined) {
+          nodes.push({
+            id: "hall",
+            label: `Hall Sensor: ${espInfo.hall}`,
+            icon: "magnet",
+            iconColor: "icon.foreground",
+          });
+        }
 
-      // Hall Sensor
-      if (espInfo.hall !== undefined) {
+        if (espInfo.psramSize !== undefined) {
+          nodes.push({
+            id: "psramSize",
+            label: `PSRAM Size: ${formatBytes(espInfo.psramSize)}`,
+            icon: "memory",
+            iconColor: "icon.foreground",
+          });
+        }
+
+        if (espInfo.uptime !== undefined) {
+          const hours = Math.floor(espInfo.uptime / 3600);
+          const minutes = Math.floor((espInfo.uptime % 3600) / 60);
+          const seconds = (espInfo.uptime % 60).toFixed(1);
+          let uptimeStr = `${seconds}s`;
+          if (minutes > 0) uptimeStr = `${minutes}m ${uptimeStr}`;
+          if (hours > 0) uptimeStr = `${hours}h ${uptimeStr}`;
+          nodes.push({
+            id: "uptime",
+            label: `Uptime: ${uptimeStr}`,
+            icon: "clock",
+            iconColor: "icon.foreground",
+          });
+        }
+
+        // If no info nodes (should not happen), add a warning
+        if (nodes.length === 1) { // only connection node
+          nodes.push({
+            id: "warning",
+            label: "No system information available",
+            icon: "warning",
+            iconColor: "icon.foreground",
+          });
+        }
+      } catch (error: any) {
+        errorMsg = error.message;
         nodes.push({
-          id: "hall",
-          label: `Hall Sensor: ${espInfo.hall}`,
-          icon: "magnet",
+          id: "connection",
+          label: `Board: Disconnected (${connect})`,
+          description: errorMsg,
+          icon: "error",
+          iconColor: "errorForeground",
         });
-      }
-
-      // PSRAM Size
-      if (espInfo.psramSize !== undefined) {
         nodes.push({
-          id: "psramSize",
-          label: `PSRAM Size: ${formatBytes(espInfo.psramSize)}`,
-          icon: "memory",
-        });
-      }
-
-      // Uptime
-      if (espInfo.uptime !== undefined) {
-        const hours = Math.floor(espInfo.uptime / 3600);
-        const minutes = Math.floor((espInfo.uptime % 3600) / 60);
-        const seconds = (espInfo.uptime % 60).toFixed(1);
-        let uptimeStr = `${seconds}s`;
-        if (minutes > 0) uptimeStr = `${minutes}m ${uptimeStr}`;
-        if (hours > 0) uptimeStr = `${hours}h ${uptimeStr}`;
-        nodes.push({
-          id: "uptime",
-          label: `Uptime: ${uptimeStr}`,
-          icon: "clock",
-        });
-      }
-
-      // If no nodes (should not happen), return error
-      if (nodes.length === 0) {
-        throw new Error("No system information available");
-      }
-
-      return nodes;
-    } catch (error: any) {
-      return [
-        {
           id: "error",
           label: "Unable to fetch system information",
-          description: error.message,
-          icon: "error",
-        },
-      ];
+          description: errorMsg,
+          icon: "warning",
+          iconColor: "icon.foreground",
+        });
+      }
     }
+
+    return nodes;
   }
 }

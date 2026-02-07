@@ -701,18 +701,12 @@ class BoardOperations {
         const allDiffs = this.decorations.getDiffsFilesOnly();
         const allLocalOnly = this.decorations.getLocalOnlyFilesOnly();
         if (allDiffs.length === 0 && allLocalOnly.length === 0) {
-            const runCheck = await vscode.window.showInformationMessage("No file differences detected. You need to check for differences first before syncing.", "Check Differences Now");
-            if (runCheck === "Check Differences Now") {
-                await this.checkDiffs();
-                // After checking diffs, try again - check both diffs and local-only files
-                const newDiffs = this.decorations.getDiffsFilesOnly();
-                const newLocalOnly = this.decorations.getLocalOnlyFilesOnly();
-                if (newDiffs.length === 0 && newLocalOnly.length === 0) {
-                    vscode.window.showInformationMessage("No differences found between local and board files.");
-                    return;
-                }
-            }
-            else {
+            // No differences detected; run diff check automatically
+            await this.checkDiffs();
+            const newDiffs = this.decorations.getDiffsFilesOnly();
+            const newLocalOnly = this.decorations.getLocalOnlyFilesOnly();
+            if (newDiffs.length === 0 && newLocalOnly.length === 0) {
+                vscode.window.showInformationMessage("No differences found between local and board files.");
                 return;
             }
         }
@@ -806,8 +800,8 @@ class BoardOperations {
         // Get current diffs and filter to files by comparing with current device stats
         const deviceStats = await this.withAutoSuspend(() => mp.listTreeStats(rootPath));
         const filesSet = new Set(deviceStats.filter(e => !e.isDir).map(e => e.path));
-        const diffs = this.decorations.getDiffsFilesOnly().filter(p => filesSet.has(p));
-        const boardOnlyFiles = this.decorations.getBoardOnlyFilesOnly().filter(p => filesSet.has(p));
+        let diffs = this.decorations.getDiffsFilesOnly().filter(p => filesSet.has(p));
+        let boardOnlyFiles = this.decorations.getBoardOnlyFilesOnly().filter(p => filesSet.has(p));
         if (diffs.length === 0 && boardOnlyFiles.length === 0) {
             const localOnlyFiles = this.decorations.getLocalOnly();
             if (localOnlyFiles.length > 0) {
@@ -815,14 +809,17 @@ class BoardOperations {
                 if (syncLocalToBoard === "Sync Local → Board") {
                     await this.syncDiffsLocalToBoard();
                 }
+                return;
             }
-            else {
-                const checkNow = await vscode.window.showWarningMessage("Board: No diffed files found to sync. You need to run 'Check Differences' first to detect changes between board and local files.", { modal: true }, "Check Differences Now");
-                if (checkNow === "Check Differences Now") {
-                    await this.checkDiffs();
-                }
+            // No local-only files, run diff check automatically
+            await this.checkDiffs();
+            diffs = this.decorations.getDiffsFilesOnly().filter(p => filesSet.has(p));
+            boardOnlyFiles = this.decorations.getBoardOnlyFilesOnly().filter(p => filesSet.has(p));
+            if (diffs.length === 0 && boardOnlyFiles.length === 0) {
+                vscode.window.showInformationMessage("No differences found between board and local files.");
+                return;
             }
-            return;
+            // If we have diffs now, continue to sync (break out of the if block)
         }
         await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Board: Sync Diffed Files Board → Local", cancellable: false }, async (progress) => {
             let done = 0;

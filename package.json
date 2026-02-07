@@ -46,6 +46,11 @@
         "view": "mpyWorkbenchFsView",
         "contents": "No serial port selected.\n\n[Select Serial Port](command:mpyWorkbench.pickPort)",
         "when": "!mpyWorkbench.hasPort"
+      },
+      {
+        "view": "mpyWorkbenchUsageView",
+        "contents": "No serial port selected.\n\n[Select Serial Port](command:mpyWorkbench.pickPort)",
+        "when": "!mpyWorkbench.hasPort"
       }
     ],
     "viewsContainers": {
@@ -77,6 +82,11 @@
           "id": "mpyWorkbenchSyncView",
           "name": "Sync Files",
           "icon": "$(sync)"
+        },
+        {
+          "id": "mpyWorkbenchUsageView",
+          "name": "Usage",
+          "icon": "$(database)"
         }
       ]
     },
@@ -84,6 +94,11 @@
       {
         "command": "mpyWorkbench.refresh",
         "title": "MPY Workbench: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mpyWorkbench.refreshUsage",
+        "title": "MPY Workbench: Refresh Usage",
         "icon": "$(refresh)"
       },
       {
@@ -268,10 +283,6 @@
           "light": "./media/trash-red.svg",
           "dark": "./media/trash-red.svg"
         }
-      },
-      {
-        "command": "mpyWorkbench.toggleWorkspaceAutoSync",
-        "title": "MPY Workbench: Toggle workspace Auto-Sync on Save"
       }
     ],
     "menus": {
@@ -335,6 +346,11 @@
           "command": "mpyWorkbench.checkDiffsFromView",
           "when": "view == mpyWorkbenchSyncView",
           "group": "navigation@3"
+        },
+        {
+          "command": "mpyWorkbench.refreshUsage",
+          "when": "view == mpyWorkbenchUsageView",
+          "group": "navigation@0"
         }
       ],
       "view/item/context": [
@@ -404,11 +420,7 @@
       "type": "object",
       "title": "MPY Workbench",
       "properties": {
-        "mpyWorkbench.autoSyncOnSave": {
-          "type": "boolean",
-          "default": false,
-          "description": "Auto-sync on save: when enabled, saving a local file also uploads it to the board; when disabled, only saves locally. Per-workspace override available in .mpystudio/config.json."
-        },
+
         "mpyWorkbench.connect": {
           "type": "string",
           "default": "auto",

@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { Esp32Tree } from "./esp32Fs";
 import { ActionsTree } from "./actions";
 import { SyncTree } from "./syncView";
+import { UsageTree } from "./usageView";
 import { Esp32Node } from "./types";
 import * as mp from "./mpremote";
 import { refreshFileTreeCache, debugTreeParsing, debugFilesystemStatus, runMpremote } from "./mpremote";
@@ -167,12 +168,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Returns true if autosync should run for this workspace (per-workspace override file wins, otherwise global setting)
-  async function workspaceAutoSyncEnabled(wsPath: string): Promise<boolean> {
-    const cfg = await readWorkspaceConfig(wsPath);
-    if (typeof cfg.autoSyncOnSave === 'boolean') return cfg.autoSyncOnSave;
-    return vscode.workspace.getConfiguration().get<boolean>('mpyWorkbench.autoSyncOnSave', false);
-  }
+
 
   // Context key for welcome UI when no port is selected
   const updatePortContext = () => {
@@ -190,6 +186,8 @@ export function activate(context: vscode.ExtensionContext) {
   const actionsView = vscode.window.createTreeView("mpyWorkbenchActionsView", { treeDataProvider: actionsTree });
   const syncTree = new SyncTree();
   const syncView = vscode.window.createTreeView("mpyWorkbenchSyncView", { treeDataProvider: syncTree });
+  const usageTree = new UsageTree();
+  const usageView = vscode.window.createTreeView("mpyWorkbenchUsageView", { treeDataProvider: usageTree });
   const decorations = new Esp32DecorationProvider();
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(decorations));
   // Export decorations for use in other modules
@@ -197,13 +195,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Create BoardOperations instance
   const boardOperations = new BoardOperations(tree, decorations);
-  let lastLocalOnlyNotice = 0;
 
-  // Status bar item to show workspace auto-sync state
-  const autoSyncStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  autoSyncStatus.command = 'mpyWorkbench.toggleWorkspaceAutoSync';
-  autoSyncStatus.tooltip = 'Toggle workspace Auto-Sync on Save';
-  context.subscriptions.push(autoSyncStatus);
+
+
 
   // Status bar item for canceling all tasks
   const cancelTasksStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
@@ -213,37 +207,13 @@ export function activate(context: vscode.ExtensionContext) {
   cancelTasksStatus.color = new vscode.ThemeColor('statusBarItem.warningForeground');
   context.subscriptions.push(cancelTasksStatus);
 
-  async function refreshAutoSyncStatus() {
-    try {
-      const ws = vscode.workspace.workspaceFolders?.[0];
-      if (!ws) {
-        autoSyncStatus.text = 'MPY: no ws';
-        autoSyncStatus.show();
-        return;
-      }
-      const enabled = await workspaceAutoSyncEnabled(ws.uri.fsPath);
-      autoSyncStatus.text = enabled ? 'MPY: AutoSync ON' : 'MPY: AutoSync OFF';
-      autoSyncStatus.color = enabled ? undefined : new vscode.ThemeColor('statusBarItem.warningForeground');
-      autoSyncStatus.show();
-    } catch (e) {
-      autoSyncStatus.text = 'MPY: ?';
-      autoSyncStatus.show();
-    }
-  }
+
 
   // Watch for workspace config changes in .mpystudio/config.json to update the status
-  if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
-    const wsPath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-    const cfgGlob = new vscode.RelativePattern(wsPath, '.mpystudio/config.json');
-    const watcher = vscode.workspace.createFileSystemWatcher(cfgGlob);
-    watcher.onDidChange(refreshAutoSyncStatus);
-    watcher.onDidCreate(refreshAutoSyncStatus);
-    watcher.onDidDelete(refreshAutoSyncStatus);
-    context.subscriptions.push(watcher);
-  }
+
 
   // Initialize status bar on activation
-  refreshAutoSyncStatus();
+
   cancelTasksStatus.show();
 
   // Ensure sensible ignore files exist or are upgraded from old stub
@@ -295,11 +265,15 @@ export function activate(context: vscode.ExtensionContext) {
     view,
     actionsView,
     syncView,
+    usageView,
     vscode.commands.registerCommand("mpyWorkbench.refresh", () => {
       // Clear cache and force next listing to come from device
       tree.clearCache();
       tree.enableRawListForNext();
       tree.refreshTree();
+    }),
+    vscode.commands.registerCommand("mpyWorkbench.refreshUsage", () => {
+      usageTree.refreshTree();
     }),
     vscode.commands.registerCommand("mpyWorkbench.refreshFileTreeCache", async () => {
       try {
@@ -389,9 +363,10 @@ export function activate(context: vscode.ExtensionContext) {
    await vscode.workspace.getConfiguration().update("mpyWorkbench.connect", value, vscode.ConfigurationTarget.Global);
    updatePortContext();
    vscode.window.showInformationMessage(`Board connect set to ${value}`);
-   tree.clearCache();
-   tree.refreshTree();
-   // (no prompt) just refresh the tree after selecting port
+    tree.clearCache();
+    tree.refreshTree();
+    usageTree.refreshTree();
+    // (no prompt) just refresh the tree after selecting port
     }),
     vscode.commands.registerCommand("mpyWorkbench.serialSendCtrlC", serialSendCtrlC),
     vscode.commands.registerCommand("mpyWorkbench.stop", stop),
@@ -1365,62 +1340,14 @@ export function activate(context: vscode.ExtensionContext) {
   );
   // Auto-upload on save: if file is inside a workspace, push to device path mapped by mpyWorkbench.rootPath
   context.subscriptions.push(
-    vscode.workspace.onDidSaveTextDocument(async (doc) => {
-      const ws = vscode.workspace.getWorkspaceFolder(doc.uri);
-      if (!ws) return;
-      // Only create .mpy-workbench directory if workspace is initialized
-      const initialized = await isLocalSyncInitialized();
-      if (!initialized) return;
-      // ensure project config folder exists
-  await ensureMpyWorkbenchDir(ws.uri.fsPath);
-      const enabled = await workspaceAutoSyncEnabled(ws.uri.fsPath);
-      if (!enabled) {
-        const now = Date.now();
-        if (now - lastLocalOnlyNotice > 5000) {
-          vscode.window.setStatusBarMessage("Board: Auto sync disabled — saved locally only (workspace)", 3000);
-          lastLocalOnlyNotice = now;
-        }
-        return; // save locally only
-      }
-      const rootPath = vscode.workspace.getConfiguration().get<string>("mpyWorkbench.rootPath", "/");
-      const rel = path.relative(ws.uri.fsPath, doc.uri.fsPath).replace(/\\/g, "/");
-      try {
-        const matcher = await createIgnoreMatcher(ws.uri.fsPath);
-        if (matcher(rel, false)) {
-          // Skip auto-upload for ignored files
-          return;
-        }
-      } catch {}
-      const deviceDest = (rootPath === "/" ? "/" : rootPath.replace(/\/$/, "")) + "/" + rel;
-      try {
-        await withAutoSuspend(() => mp.cpToDevice(doc.uri.fsPath, deviceDest));
-        tree.addNode(deviceDest, false);
-      }
-      catch (e) {
-        console.error(`[DEBUG] Auto-upload failed for ${rel}:`, e);
-        vscode.window.showWarningMessage(`Board auto-upload failed for ${rel}: ${String((e as any)?.message ?? e)}`);
-      }
-    }),
+
     vscode.window.onDidCloseTerminal((terminal) => {
       if (terminal.name === "ESP32 REPL") {
         // replTerminal is now managed in mpremoteCommands.ts
       }
     })
   );
-  // Command to toggle workspace-level autosync setting
-  context.subscriptions.push(vscode.commands.registerCommand('mpyWorkbench.toggleWorkspaceAutoSync', async () => {
-    try {
-      const ws = getWorkspaceFolder();
-      const cfg = await readWorkspaceConfig(ws.uri.fsPath);
-      const current = !!cfg.autoSyncOnSave;
-      cfg.autoSyncOnSave = !current;
-      await writeWorkspaceConfig(ws.uri.fsPath, cfg);
-      vscode.window.showInformationMessage(`Workspace auto-sync on save is now ${cfg.autoSyncOnSave ? 'ENABLED' : 'DISABLED'}`);
-  try { await refreshAutoSyncStatus(); } catch {}
-    } catch (e) {
-      vscode.window.showErrorMessage('Failed to toggle workspace auto-sync: ' + String(e));
-    }
-  }));
+
 }
 
 export function deactivate() {}

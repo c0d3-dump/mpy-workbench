@@ -45,7 +45,6 @@ export class InfoTree implements vscode.TreeDataProvider<InfoNode> {
     this._onDidChangeTreeData.dispose();
   }
 
-
   // Queue for serial operations
   private opQueue: Promise<any> = Promise.resolve();
   private skipIdleOnce = false;
@@ -59,8 +58,11 @@ export class InfoTree implements vscode.TreeDataProvider<InfoNode> {
       item.description = element.description;
     }
     if (element.icon) {
-      item.iconPath = element.iconColor 
-        ? new vscode.ThemeIcon(element.icon, new vscode.ThemeColor(element.iconColor))
+      item.iconPath = element.iconColor
+        ? new vscode.ThemeIcon(
+            element.icon,
+            new vscode.ThemeColor(element.iconColor),
+          )
         : new vscode.ThemeIcon(element.icon);
     }
     item.tooltip = element.label;
@@ -369,7 +371,7 @@ print('=' * 60)`;
           nodes.push({
             id: "cpuFreq",
             label: `CPU Frequency: ${mhz.toFixed(0)} MHz`,
-            icon: "cpu",
+            icon: "chip",
             iconColor: "icon.foreground",
           });
         }
@@ -378,71 +380,47 @@ print('=' * 60)`;
           nodes.push({
             id: "flashSize",
             label: `Flash Size: ${formatBytes(espInfo.flashSize)}`,
-            icon: "database",
+            icon: "github-action",
             iconColor: "icon.foreground",
           });
         }
 
-        if (espInfo.fsTotal !== undefined) {
-          nodes.push({
-            id: "fsTotal",
-            label: `Storage Total: ${formatBytes(espInfo.fsTotal)}`,
-            icon: "database",
-            iconColor: "icon.foreground",
-          });
-        }
-        if (espInfo.fsUsed !== undefined && espInfo.fsUsagePercent !== undefined) {
+        if (
+          espInfo.fsUsed !== undefined &&
+          espInfo.fsUsagePercent !== undefined
+        ) {
           nodes.push({
             id: "fsUsed",
             label: `Storage Used: ${formatBytes(espInfo.fsUsed)} (${espInfo.fsUsagePercent.toFixed(1)}%)`,
-            description: espInfo.fsFree !== undefined ? `Free: ${formatBytes(espInfo.fsFree)}` : undefined,
-            icon: "circle-filled",
-            iconColor: "icon.foreground",
-          });
-        } else if (espInfo.fsUsed !== undefined) {
-          nodes.push({
-            id: "fsUsed",
-            label: `Storage Used: ${formatBytes(espInfo.fsUsed)}`,
-            icon: "circle-filled",
+            description:
+              espInfo.fsFree !== undefined
+                ? `Free: ${formatBytes(espInfo.fsFree)}`
+                : undefined,
+            icon: "database",
             iconColor: "icon.foreground",
           });
         }
 
-        if (espInfo.micropythonVersion !== undefined) {
-          nodes.push({
-            id: "micropythonVersion",
-            label: `MicroPython: ${espInfo.micropythonVersion}`,
-            icon: "code",
-            iconColor: "icon.foreground",
-          });
-        }
-
-        if (espInfo.ramTotal !== undefined) {
-          nodes.push({
-            id: "ramTotal",
-            label: `RAM Total: ${formatBytes(espInfo.ramTotal)}`,
-            icon: "memory",
-            iconColor: "icon.foreground",
-          });
-        }
-        if (espInfo.ramAlloc !== undefined && espInfo.ramUsagePercent !== undefined) {
+        if (
+          espInfo.ramAlloc !== undefined &&
+          espInfo.ramUsagePercent !== undefined
+        ) {
           nodes.push({
             id: "ramUsed",
             label: `RAM Used: ${formatBytes(espInfo.ramAlloc)} (${espInfo.ramUsagePercent.toFixed(1)}%)`,
-            description: espInfo.ramFree !== undefined ? `Free: ${formatBytes(espInfo.ramFree)}` : undefined,
-            icon: "circle-filled",
-            iconColor: "icon.foreground",
-          });
-        } else if (espInfo.ramAlloc !== undefined) {
-          nodes.push({
-            id: "ramUsed",
-            label: `RAM Used: ${formatBytes(espInfo.ramAlloc)}`,
-            icon: "circle-filled",
+            description:
+              espInfo.ramFree !== undefined
+                ? `Free: ${formatBytes(espInfo.ramFree)}`
+                : undefined,
+            icon: "layers",
             iconColor: "icon.foreground",
           });
         }
 
-        if (espInfo.temperatureC !== undefined && espInfo.temperatureF !== undefined) {
+        if (
+          espInfo.temperatureC !== undefined &&
+          espInfo.temperatureF !== undefined
+        ) {
           nodes.push({
             id: "temperature",
             label: `Temperature: ${espInfo.temperatureC.toFixed(1)}°C / ${espInfo.temperatureF.toFixed(1)}°F`,
@@ -499,7 +477,8 @@ print('=' * 60)`;
         }
 
         // If no info nodes (should not happen), add a warning
-        if (nodes.length === 1) { // only connection node
+        if (nodes.length === 1) {
+          // only connection node
           nodes.push({
             id: "warning",
             label: "No system information available",

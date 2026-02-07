@@ -3,6 +3,7 @@ import { Esp32Tree } from "./esp32Fs";
 import { ActionsTree } from "./actions";
 import { SyncTree } from "./syncView";
 import { InfoTree } from "./infoView";
+import { FirmwareTree } from "./firmwareView";
 import { Esp32Node } from "./types";
 import * as mp from "./mpremote";
 import {
@@ -26,6 +27,7 @@ import {
 import { Esp32DecorationProvider } from "./decorations";
 import { listDirPyRaw } from "./pyraw";
 import { BoardOperations } from "./boardOperations";
+import { firmwareFlash, firmwareErase, firmwareVerify, firmwareCleanup } from "./firmwareOperations";
 // import { monitor } from "./monitor"; // switched to auto-suspend REPL strategy
 import {
   disconnectReplTerminal,
@@ -222,6 +224,10 @@ export function activate(context: vscode.ExtensionContext) {
   const usageView = vscode.window.createTreeView("mpyWorkbenchUsageView", {
     treeDataProvider: infoTree,
   });
+  const firmwareTree = new FirmwareTree();
+  const firmwareView = vscode.window.createTreeView("mpyWorkbenchFirmwareView", {
+    treeDataProvider: firmwareTree,
+  });
   const decorations = new Esp32DecorationProvider();
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(decorations),
@@ -317,6 +323,7 @@ export function activate(context: vscode.ExtensionContext) {
     actionsView,
     syncView,
     usageView,
+    firmwareView,
     vscode.commands.registerCommand("mpyWorkbench.refresh", () => {
       // Clear cache and force next listing to come from device
       tree.clearCache();
@@ -1971,6 +1978,10 @@ export function activate(context: vscode.ExtensionContext) {
         else vscode.commands.executeCommand("mpyWorkbench.refresh");
       },
     ),
+    vscode.commands.registerCommand("mpyWorkbench.firmwareFlash", firmwareFlash),
+    vscode.commands.registerCommand("mpyWorkbench.firmwareErase", firmwareErase),
+    vscode.commands.registerCommand("mpyWorkbench.firmwareVerify", firmwareVerify),
+    vscode.commands.registerCommand("mpyWorkbench.firmwareCleanup", firmwareCleanup),
   );
   // Auto-upload on save: if file is inside a workspace, push to device path mapped by mpyWorkbench.rootPath
   context.subscriptions.push(

@@ -38,7 +38,8 @@ async function restartReplInExistingTerminal() {
             return;
         const device = connect.replace(/^serial:\/\//, "").replace(/^serial:\//, "");
         // Simply restart mpremote connect command
-        const cmd = `mpremote connect ${device}`;
+        const mpremotePath = await mp.getMpremotePath();
+        const cmd = `${mpremotePath} connect ${device}`;
         if (replTerminal)
             replTerminal.sendText(cmd, true);
         await new Promise(r => setTimeout(r, 200));
@@ -46,17 +47,23 @@ async function restartReplInExistingTerminal() {
     catch { }
 }
 async function checkMpremoteAvailability() {
-    return new Promise((resolve, reject) => {
-        (0, node_child_process_1.exec)('mpremote --version', (err, stdout, stderr) => {
-            if (err) {
-                vscode.window.showWarningMessage('mpremote not found. Please install mpremote: pip install mpremote');
-                reject(err);
-            }
-            else {
-                resolve();
-            }
+    try {
+        const mpremotePath = await mp.getMpremotePath();
+        await new Promise((resolve, reject) => {
+            (0, node_child_process_1.exec)(`${mpremotePath} --version`, (err, stdout, stderr) => {
+                if (err) {
+                    vscode.window.showWarningMessage('mpremote not found. Please install mpremote: pip install mpremote or pipx install mpremote');
+                    reject(err);
+                }
+                else {
+                    resolve();
+                }
+            });
         });
-    });
+    }
+    catch (err) {
+        throw err;
+    }
 }
 async function serialSendCtrlC() {
     // Use robust interrupt method
@@ -98,7 +105,8 @@ async function softReset() {
     // Use mpremote connect with explicit port
     const connect = vscode.workspace.getConfiguration().get("mpyWorkbench.connect", "auto");
     const device = connect.replace(/^serial:\/\//, "").replace(/^serial:\//, "");
-    const cmd = `mpremote connect ${device} reset`;
+    const mpremotePath = await mp.getMpremotePath();
+    const cmd = `${mpremotePath} connect ${device} reset`;
     await new Promise((resolve) => {
         (0, node_child_process_1.exec)(cmd, (error, stdout, stderr) => {
             if (error) {
@@ -137,7 +145,8 @@ async function runActiveFile() {
         cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
     });
     // Use mpremote run command
-    const cmd = `mpremote connect ${device} run "${filePath}"`;
+    const mpremotePath = await mp.getMpremotePath();
+    const cmd = `${mpremotePath} connect ${device} run "${filePath}"`;
     runTerminal.sendText(cmd, true);
     runTerminal.show(true);
 }
@@ -155,7 +164,8 @@ async function getReplTerminal(context) {
     }
     const device = connect.replace(/^serial:\/\//, "").replace(/^serial:\//, "");
     // Simply execute mpremote connect command in terminal
-    const cmd = `mpremote connect ${device}`;
+    const mpremotePath = await mp.getMpremotePath();
+    const cmd = `${mpremotePath} connect ${device}`;
     replTerminal = vscode.window.createTerminal({
         name: "ESP32 REPL",
         shellPath: process.platform === 'win32' ? "cmd.exe" : (process.env.SHELL || '/bin/bash'),

@@ -53,6 +53,11 @@
         "view": "mpyWorkbenchUsageView",
         "contents": "No serial port selected.\n\n[Select Serial Port](command:mpyWorkbench.pickPort)",
         "when": "!mpyWorkbench.hasPort"
+      },
+      {
+        "view": "mpyWorkbenchFirmwareView",
+        "contents": "No serial port selected.\n\n[Select Serial Port](command:mpyWorkbench.pickPort)",
+        "when": "!mpyWorkbench.hasPort"
       }
     ],
     "viewsContainers": {
@@ -89,6 +94,11 @@
           "id": "mpyWorkbenchUsageView",
           "name": "Info",
           "icon": "$(info)"
+        },
+        {
+          "id": "mpyWorkbenchFirmwareView",
+          "name": "Firmware",
+          "icon": "$(circuit-board)"
         }
       ]
     },
@@ -285,6 +295,26 @@
           "light": "./media/trash-red.svg",
           "dark": "./media/trash-red.svg"
         }
+      },
+      {
+        "command": "mpyWorkbench.firmwareFlash",
+        "title": "MPY Workbench: Flash MicroPython Firmware",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "mpyWorkbench.firmwareErase",
+        "title": "MPY Workbench: Erase Flash Memory",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "mpyWorkbench.firmwareVerify",
+        "title": "MPY Workbench: Verify Firmware",
+        "icon": "$(check)"
+      },
+      {
+        "command": "mpyWorkbench.firmwareCleanup",
+        "title": "MPY Workbench: Cleanup Downloaded Firmware",
+        "icon": "$(clear-all)"
       }
     ],
     "menus": {

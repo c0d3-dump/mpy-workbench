@@ -7,6 +7,7 @@ const esp32Fs_1 = require("./esp32Fs");
 const actions_1 = require("./actions");
 const syncView_1 = require("./syncView");
 const infoView_1 = require("./infoView");
+const firmwareView_1 = require("./firmwareView");
 const mp = require("./mpremote");
 const mpremote_1 = require("./mpremote");
 const path = require("node:path");
@@ -15,6 +16,7 @@ const sync_1 = require("./sync");
 const decorations_1 = require("./decorations");
 const pyraw_1 = require("./pyraw");
 const boardOperations_1 = require("./boardOperations");
+const firmwareOperations_1 = require("./firmwareOperations");
 // import { monitor } from "./monitor"; // switched to auto-suspend REPL strategy
 const mpremoteCommands_1 = require("./mpremoteCommands");
 function activate(context) {
@@ -183,6 +185,10 @@ function activate(context) {
     const usageView = vscode.window.createTreeView("mpyWorkbenchUsageView", {
         treeDataProvider: infoTree,
     });
+    const firmwareTree = new firmwareView_1.FirmwareTree();
+    const firmwareView = vscode.window.createTreeView("mpyWorkbenchFirmwareView", {
+        treeDataProvider: firmwareTree,
+    });
     const decorations = new decorations_1.Esp32DecorationProvider();
     context.subscriptions.push(vscode.window.registerFileDecorationProvider(decorations), infoTree);
     // Export decorations for use in other modules
@@ -262,7 +268,7 @@ function activate(context) {
         });
         return opQueue;
     }
-    context.subscriptions.push(view, actionsView, syncView, usageView, vscode.commands.registerCommand("mpyWorkbench.refresh", () => {
+    context.subscriptions.push(view, actionsView, syncView, usageView, firmwareView, vscode.commands.registerCommand("mpyWorkbench.refresh", () => {
         // Clear cache and force next listing to come from device
         tree.clearCache();
         tree.enableRawListForNext();
@@ -1399,7 +1405,7 @@ function activate(context) {
             tree.refreshTree();
         else
             vscode.commands.executeCommand("mpyWorkbench.refresh");
-    }));
+    }), vscode.commands.registerCommand("mpyWorkbench.firmwareFlash", firmwareOperations_1.firmwareFlash), vscode.commands.registerCommand("mpyWorkbench.firmwareErase", firmwareOperations_1.firmwareErase), vscode.commands.registerCommand("mpyWorkbench.firmwareVerify", firmwareOperations_1.firmwareVerify), vscode.commands.registerCommand("mpyWorkbench.firmwareCleanup", firmwareOperations_1.firmwareCleanup));
     // Auto-upload on save: if file is inside a workspace, push to device path mapped by mpyWorkbench.rootPath
     context.subscriptions.push(vscode.window.onDidCloseTerminal((terminal) => {
         if (terminal.name === "ESP32 REPL") {

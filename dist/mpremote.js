@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getMpremotePath = getMpremotePath;
 exports.runMpremote = runMpremote;
 exports.ls = ls;
 exports.clearFileTreeCache = clearFileTreeCache;
@@ -35,6 +36,37 @@ const node_child_process_1 = require("node:child_process");
 const vscode = require("vscode");
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
+let mpremotePathCache = null;
+async function getMpremotePath() {
+    if (mpremotePathCache) {
+        return mpremotePathCache;
+    }
+    const candidates = [
+        "mpremote",
+        `${os.homedir()}/.local/bin/mpremote`
+    ];
+    for (const candidate of candidates) {
+        try {
+            await new Promise((resolve, reject) => {
+                (0, node_child_process_1.exec)(`${candidate} --version`, (error) => {
+                    if (error) {
+                        reject(error);
+                    }
+                    else {
+                        resolve();
+                    }
+                });
+            });
+            mpremotePathCache = candidate;
+            return candidate;
+        }
+        catch (err) {
+            // continue
+        }
+    }
+    throw new Error("mpremote not found. Please install mpremote: pip install mpremote or pipx install mpremote");
+}
 function normalizeConnect(c) {
     if (c.startsWith("serial://"))
         return c.replace(/^serial:\/\//, "");
@@ -139,7 +171,8 @@ class ConnectionManager {
 }
 // Global connection manager instance
 const connectionManager = new ConnectionManager();
-function runMpremote(args, opts = {}) {
+async function runMpremote(args, opts = {}) {
+    const mpremotePath = await getMpremotePath();
     return new Promise((resolve, reject) => {
         const maxRetries = opts.retryOnFailure !== false ? 2 : 0;
         let attempt = 0;
@@ -170,7 +203,7 @@ function runMpremote(args, opts = {}) {
                 }
                 return `"${arg}"`;
             });
-            const cmd = `mpremote ${escapedArgs.join(' ')}`;
+            const cmd = `${mpremotePath} ${escapedArgs.join(' ')}`;
             const child = (0, node_child_process_1.exec)(cmd, { cwd: opts.cwd }, (err, stdout, stderr) => {
                 if (currentChild === child)
                     currentChild = null;
@@ -752,12 +785,12 @@ async function listSerialPorts() {
             return null;
         }).filter(Boolean);
         if (devices.length === 0) {
-            vscode.window.showWarningMessage("No ESP32 devices detected. Make sure mpremote is installed and available in PATH.");
+            vscode.window.showWarningMessage("No ESP32 devices detected. Make sure mpremote is installed and available in PATH (pip install mpremote or pipx install mpremote).");
         }
         return devices;
     }
     catch (err) {
-        vscode.window.showWarningMessage("Error executing mpremote to detect ports: " + (err?.message || err));
+        vscode.window.showWarningMessage("Error executing mpremote to detect ports: " + (err?.message || err) + " Make sure mpremote is installed (pip install mpremote or pipx install mpremote).");
         return [];
     }
 }
